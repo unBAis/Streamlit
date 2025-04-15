@@ -1,3 +1,3 @@
 # Streamlit website
 
-Creating the simple Streamlit Website for Data Dashboarding for Streamlit testing
+Creating the Streamlit Website for Data Dashboarding for Streamlit testing
