@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA
 st.set_page_config(page_title="Advanced Data Explorer", layout="wide")
 st.title("Advanced Data Explorer Dashboard")
 
+
 uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
