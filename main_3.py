@@ -5,13 +5,10 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from kmodes.kprototypes import KPrototypes
-from sklearn.preprocessing import LabelEncoder
 from sklearn.decomposition import PCA
 
 st.set_page_config(page_title="Advanced Data Explorer", layout="wide")
 st.title("Advanced Data Explorer Dashboard")
-
 
 uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=["csv", "xlsx"])
 
@@ -128,35 +125,6 @@ if uploaded_file is not None:
                 st.warning("No valid datetime column selected for time-series analysis.")
         except Exception as e:
             st.warning(f"An error occurred with time-series analysis: {str(e)}")
-        
-        
-        # Correlation Matrix / Heatmap
-        st.subheader("Correlation Heatmap")
-        st.write("Explore the correlation between numeric variables. Select columns to include (defaults to all):")
-
-        corr_cols = st.multiselect("Select columns for correlation matrix", sorted(num_cols))
-
-        # Use all numeric columns if none selected
-        columns_to_corr = corr_cols if corr_cols else sorted(num_cols)
-
-        if len(columns_to_corr) >= 2:
-            try:
-                corr_matrix = filtered_df[columns_to_corr].corr()
-
-                fig = px.imshow(
-                    corr_matrix,
-                    text_auto=True,
-                    aspect="auto",
-                    color_continuous_scale="RdBu_r",
-                    title="Correlation Matrix"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-            except Exception as e:
-                st.warning(f"Could not create correlation matrix: {str(e)}")
-        else:
-            st.info("Please select at least two numeric columns to view the correlation heatmap.")
-
 
         # Anomaly Detection
         st.subheader("Anomaly Detection")
@@ -189,57 +157,34 @@ if uploaded_file is not None:
                 st.plotly_chart(fig, use_container_width=True)
 
         # Clustering Explorer
-
-        # Clustering Explorer (KMeans and KPrototypes)
         st.subheader("Clustering Explorer")
-        st.write("Cluster the data using KMeans or KPrototypes. PCA is used to reduce dimensions for plotting.")
-        # Common preprocessing
-        cluster_features = st.multiselect("Select features for clustering", sorted(df.columns))
+        st.write("Cluster the data based on selected numeric features.")
+        cluster_features = st.multiselect("Select numeric features for clustering", num_cols)
         n_clusters = st.slider("Number of clusters", 2, 10, 3)
-        algorithm = st.selectbox("Clustering Algorithm", ["KMeans (Numeric Only)", "KPrototypes (Mixed Data)"])
 
         if len(cluster_features) >= 2:
-            cluster_data = filtered_df[cluster_features].dropna()
-            
-            if algorithm == "KMeans (Numeric Only)":
-                numeric_data = cluster_data.select_dtypes(include='number')
-                scaled_data = StandardScaler().fit_transform(numeric_data)
-                model = KMeans(n_clusters=n_clusters, random_state=42)
-                labels = model.fit_predict(scaled_data)
-                pca_input = scaled_data
+            data = filtered_df[cluster_features].dropna()
+            scaler = StandardScaler()
+            scaled_data = scaler.fit_transform(data)
 
-            elif algorithm == "KPrototypes (Mixed Data)":
-                # Encode categorical columns
-                cat_cols = cluster_data.select_dtypes(include=['object', 'category']).columns
-                enc_data = cluster_data.copy()
-                cat_idx = []
+            kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+            labels = kmeans.fit_predict(scaled_data)
 
-                for i, col in enumerate(cluster_data.columns):
-                    if col in cat_cols:
-                        enc_data[col] = LabelEncoder().fit_transform(enc_data[col])
-                        cat_idx.append(i)
-
-                model = KPrototypes(n_clusters=n_clusters, init='Huang', n_init=5, verbose=0)
-                labels = model.fit_predict(enc_data.values, categorical=cat_idx)
-                pca_input = StandardScaler().fit_transform(enc_data.values)
-
-            # PCA and Plotting (only once)
             pca = PCA(n_components=3)
-            components = pca.fit_transform(pca_input)
+            components = pca.fit_transform(scaled_data)
             cluster_df = pd.DataFrame(components, columns=["PC1", "PC2", "PC3"])
             cluster_df["Cluster"] = labels.astype(str)
 
             plot_dim = st.radio("Select plot dimensions", ["2D", "3D"])
-            fig = (
-                px.scatter(cluster_df, x="PC1", y="PC2", color="Cluster")
-                if plot_dim == "2D"
-                else px.scatter_3d(cluster_df, x="PC1", y="PC2", z="PC3", color="Cluster")
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            if plot_dim == "2D":
+                fig = px.scatter(cluster_df, x="PC1", y="PC2", color="Cluster")
+            else:
+                fig = px.scatter_3d(cluster_df, x="PC1", y="PC2", z="PC3", color="Cluster")
 
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Please select at least two features for clustering.")
-      
+            st.info("Please select at least two numeric features for clustering.")
+
         # Download Filtered Data
         st.subheader("Download Filtered Data")
         csv = filtered_df.to_csv(index=False).encode("utf-8")
